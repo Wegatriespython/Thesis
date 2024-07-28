@@ -3,7 +3,7 @@
 class Config:
     def __init__(self):
         # Common parameters
-        self.INITIAL_CAPITAL = 2
+        self.INITIAL_CAPITAL = 10
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
         self.INITIAL_WAGE = 1
