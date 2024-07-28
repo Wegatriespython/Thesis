@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.optimize import minimize
-
+from Config import config
 def simple_profit_maximization(budget, current_capital, current_labor, current_price, current_productivity,
                                expected_demand, avg_wage, avg_capital_price, capital_elasticity):
     max_profit = float('-inf')
@@ -9,8 +9,8 @@ def simple_profit_maximization(budget, current_capital, current_labor, current_p
     optimal_price = current_price
     optimal_production = 0
 
-    max_labor = budget / avg_wage
-    max_capital = current_capital + budget / avg_capital_price
+    max_labor = budget / max(avg_wage, config.MINIMUM_WAGE)
+    max_capital = current_capital + budget / max(avg_capital_price, config.INITIAL_PRICE)
 
     labor_range = np.linspace(0, max_labor, 100)
     capital_range = np.linspace(current_capital, max_capital, 100)

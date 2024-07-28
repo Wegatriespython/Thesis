@@ -1,6 +1,7 @@
-# Description: This file contains the Worker class, which is a subclass of the Agent class from the mesa library. The Worker class represents a worker agent in the model. Each worker has a unique ID, a boolean employed, an employer, a wage, savings, skills, consumption, and a boolean satiated. The Worker class has a step method that updates the worker's skills and a calculate_desired_consumption method that calculates the worker's desired consumption based on their wage and savings. The Worker class is used in the model to represent workers in the labor market.
+# mesa_worker.py
+
 from mesa import Agent
-from Config import Config
+from Accounting_System import AccountingSystem
 
 class Worker(Agent):
     def __init__(self, unique_id, model):
@@ -12,6 +13,7 @@ class Worker(Agent):
         self.skills = model.config.INITIAL_SKILLS
         self.consumption = model.config.INITIAL_CONSUMPTION
         self.satiated = False
+        self.accounts = AccountingSystem()
 
     def step(self):
         if self.consumption > 0:
@@ -26,3 +28,30 @@ class Worker(Agent):
 
     def calculate_desired_consumption(self):
         return min(self.wage * self.model.config.CONSUMPTION_PROPENSITY, self.savings)
+
+    def get_hired(self, employer, wage):
+        self.employed = True
+        self.employer = employer
+        self.wage = wage
+        self.accounts.record_income('wages', wage)
+
+    def get_fired(self):
+        self.employed = False
+        self.employer = None
+        self.wage = 0
+
+    def consume(self, quantity, price):
+        total_cost = quantity * price
+        self.consumption += quantity
+        self.savings -= total_cost
+        self.accounts.record_expense('consumption', total_cost)
+
+    def get_min_wage(self):
+        return max(self.model.config.MINIMUM_WAGE, self.wage * (1 - self.model.config.WAGE_ADJUSTMENT_RATE))
+
+    def get_max_consumption_price(self):
+        desired_consumption = self.calculate_desired_consumption()
+        return self.savings / desired_consumption if desired_consumption > 0 else 0
+
+    def update_after_markets(self):
+        self.accounts.update_balance_sheet()

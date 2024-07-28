@@ -10,52 +10,12 @@ from collections import defaultdict
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def run_model(steps, timeout=300):  # 5 minutes timeout
-    def handler(signum, frame):
-        raise TimeoutError("Model execution timed out")
-
-    signal.signal(signal.SIGABRT, handler)
-    signal.alarm(timeout)
-
-    transactions_data = defaultdict(list)
-
-    try:
         model = EconomyModel(num_workers=20, num_firm1=2, num_firm2=5)
         for i in range(steps):
-            logging.info(f"Starting step {i+1} of {steps}")
             model.step()
-            
-            # Collect transaction data
-            transactions_data['labor'].extend([(i+1, *t) for t in model.labor_transactions])
-            transactions_data['capital'].extend([(i+1, *t) for t in model.capital_transactions])
-            transactions_data['consumption'].extend([(i+1, *t) for t in model.consumption_transactions])
-            
-            logging.info(f"Completed step {i+1} of {steps}")
-        
-        # Write transaction data to CSV
-        with open('transactions.csv', 'w', newline='') as csvfile:
-            fieldnames = ['step', 'market', 'buyer', 'seller', 'quantity', 'price']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            for market, transactions in transactions_data.items():
-                for transaction in transactions:
-                    writer.writerow({
-                        'step': transaction[0],
-                        'market': market,
-                        'buyer': transaction[1].unique_id,
-                        'seller': transaction[2].unique_id,
-                        'quantity': transaction[3],
-                        'price': transaction[4]
-                    })
-        
-        logging.info("Transaction data written to transactions.csv")
-        model.write_logs()
+                 
+    
         return model.datacollector
-    except TimeoutError as e:
-        logging.error(f"Model execution timed out after {timeout} seconds")
-        return None
-    finally:
-        signal.alarm(0)
 
 # Run the model
 collector = run_model(100)  # Run for 100 steps
@@ -102,3 +62,29 @@ if collector:
     print(f"Final Global Productivity: {model_vars['Global Productivity'].iloc[-1]:.2f}")
 else:
     logging.error("Model did not complete successfully. Unable to perform analysis.")
+
+# Error message for future reference
+"""
+Traceback (most recent call last):
+    File "C:\ProgramData\anaconda3\Lib\site-packages\pandas\core\indexes\base.py", line 3791, in get_loc
+        return self._engine.get_loc(casted_key)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "index.pyx", line 152, in pandas._libs.index.IndexEngine.get_loc
+    File "index.pyx", line 181, in pandas._libs.index.IndexEngine.get_loc
+    File "pandas\_libs\hashtable_class_helper.pxi", line 7080, in pandas._libs.hashtable.PyObjectHashTable.get_item
+    File "pandas\_libs\hashtable_class_helper.pxi", line 7088, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'Demand'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+    File "v:\Python Port\mesa_run_light.py", line 53, in <module>
+        firm2_demand = firm2_data['Demand'].groupby(level=0).sum()
+                                     ~~~~~~~~~~^^^^^^^^^^
+    File "C:\ProgramData\anaconda3\Lib\site-packages\pandas\core\frame.py", line 3893, in __getitem__
+        indexer = self.columns.get_loc(key)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "C:\ProgramData\anaconda3\Lib\site-packages\pandas\core\indexes\base.py", line 3798, in get_loc
+        raise KeyError(key) from err
+KeyError: 'Demand'
+"""
