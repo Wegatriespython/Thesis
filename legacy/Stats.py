@@ -1,6 +1,6 @@
-from firm1 import Firm1
-from firm2 import Firm2
-from Worker import Worker
+from legacy.firm1 import Firm1
+from legacy.firm2 import Firm2
+from legacy.Worker import Worker
 import csv
 
 class DataCollector:
@@ -29,9 +29,11 @@ class DataCollector:
             "productivity": firm.productivity,
             "price": firm.price,
             "inventory": firm.inventory,
+            "sales": firm.sales,
             "workers": len(firm.workers),
             "RD_investment": firm.RD_investment,
             "demand": firm.demand,
+            "budget": firm.budget,
             "production": firm.production,
             "wage_offers": len(firm.wage_offers)
         }
@@ -44,23 +46,27 @@ class DataCollector:
             "capital": firm.capital,
             "productivity": firm.productivity,
             "price": firm.price,
+            "sales": firm.sales,
             "inventory": firm.inventory,
             "workers": len(firm.workers),
             "demand": firm.demand,
+            "budget": firm.budget,
+            "sales": firm.sales,
             "investment": firm.investment,
             "investment_demand": firm.investment_demand,
             "desired_capital": firm.desired_capital,
             "production": firm.production,
             "wage_offers": len(firm.wage_offers)
         }
-
     def collect_worker_data(self, worker: Worker):
         return {
             "employed": worker.employed,
             "wage": worker.wage,
             "skills": worker.skills,
             "offers": len(worker.offers),
-            "consumption": worker.consumption  # Add this line
+            "savings": worker.savings,
+            "consumption": worker.consumption
+              # Add this line
         }
     def get_data(self):
         """

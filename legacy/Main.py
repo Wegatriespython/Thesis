@@ -1,5 +1,5 @@
-from economy import Economy
-from Scheduler import Scheduler
+from legacy.economy import Economy
+from legacy.Scheduler import Scheduler
 from Config import config
 
 def run_simulation():
