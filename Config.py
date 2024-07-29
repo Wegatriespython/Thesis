@@ -8,11 +8,14 @@ class Config:
         self.INITIAL_PRICE = 1
         self.INITIAL_WAGE = 1
         self.MAX_MPL = 100
-        self.INITIAL_INVENTORY = 20
-        self.INITIAL_DEMAND = 1
+        self.INITIAL_INVENTORY = 4
+        self.INITIAL_DEMAND = 5
+        self.DEPRECIATION_RATE = 0.6
         self.MIN_DEMAND = 1
         self.INITIAL_SKILLS = .1
         self.DEMAND_ADJUSTMENT_RATE = 0.5 
+        self.DISCOUNT_FACTOR = 0.95
+        self.DECISION_HORIZON = 100
         self.MARKUP_RATE = 0.2
         self.INITIAL_SAVINGS = 100
         self.MIN_CONSUMPTION = 1
@@ -21,7 +24,7 @@ class Config:
         self.JOB_LOSS_PROBABILITY = 0.05
         self.MINIMUM_WAGE = 1
         self.CONSUMPTION_PROPENSITY =1
-        self.INITIAL_CONSUMPTION = 0
+        self.INITIAL_CONSUMPTION = 1
         self.TOTAL_FACTOR_PRODUCTIVITY = 1.0
         self.CAPITAL_ELASTICITY = 0.3
         self.CAPITAL_RENTAL_RATE = 0.05
@@ -46,9 +49,9 @@ class Config:
         self.FIRM2_INVENTORY_THRESHOLD = 20
 
         # Simulation parameters
-        self.INITIAL_WORKERS = 20
+        self.INITIAL_WORKERS = 30
         self.INITIAL_CAPITAL_FIRMS = 2  # This was previously INITIAL_FIRM1S
-        self.INITIAL_CONSUMPTION_FIRMS = 5  # This was previously INITIAL_FIRM2S
+        self.INITIAL_CONSUMPTION_FIRMS = 3  # This was previously INITIAL_FIRM2S
         self.SIMULATION_STEPS = 10
 
 # Create a global configuration object
