@@ -111,6 +111,7 @@ class EconomyModel(Model):
         print("Labor Market")
         transactions = market_matching(buyers, sellers)
         self.process_labor_transactions(transactions)
+        self.global_accounting.update_sellers([], sellers, [])
 
     def execute_capital_market(self):
         buyers = self.get_capital_buyers()
@@ -118,6 +119,7 @@ class EconomyModel(Model):
         print("Capital Market")
         transactions = market_matching(buyers, sellers)
         self.process_capital_transactions(transactions)
+        self.global_accounting.update_sellers(sellers, [], [])
 
     def execute_consumption_market(self):
         buyers = self.get_consumption_buyers()
@@ -125,7 +127,8 @@ class EconomyModel(Model):
         print("Consumption Market")
         transactions = market_matching(buyers, sellers)
         self.process_consumption_transactions(transactions)
-        self.update_price_history() 
+        self.global_accounting.update_sellers([], [], sellers)
+        self.update_price_history()
         
     def update_price_history(self):
         current_price = self.global_accounting.get_average_consumption_good_price()

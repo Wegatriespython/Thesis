@@ -56,6 +56,9 @@ class GlobalAccountingSystem:
         self.consumption_good_prices = [max(1, config.INITIAL_PRICE)]
         
         self.firms = []
+        self.last_capital_sellers = []
+        self.last_labor_sellers = []
+        self.last_consumption_sellers = []
 
     def record_labor_transaction(self, firm, worker, quantity, price):
         self.total_money += price * quantity
@@ -89,15 +92,28 @@ class GlobalAccountingSystem:
 
     def get_average_market_demand(self):
         return max(1, sum(self.market_demand) / len(self.market_demand) if self.market_demand else 0)
-
+    
     def get_average_capital_price(self):
-        return max(1, sum(self.capital_prices) / len(self.capital_prices) if self.capital_prices else 0)
+        if self.capital_prices:
+            return max(1, sum(self.capital_prices) / len(self.capital_prices))
+        elif self.last_capital_sellers:
+            return max(1, sum(seller.price for seller in self.last_capital_sellers) / len(self.last_capital_sellers))
+        return max(1, config.INITIAL_PRICE)
 
     def get_average_wage(self):
-        return max(1, sum(self.wages) / len(self.wages) if self.wages else 0)
+        if self.wages:
+            return max(1, sum(self.wages) / len(self.wages))
+        elif self.last_labor_sellers:
+            return max(1, sum(seller.wage for seller in self.last_labor_sellers) / len(self.last_labor_sellers))
+        return max(1, config.INITIAL_WAGE)
 
     def get_average_consumption_good_price(self):
-        return max(1, sum(self.consumption_good_prices) / len(self.consumption_good_prices) if self.consumption_good_prices else 0)
+        if self.consumption_good_prices:
+            return max(1, sum(self.consumption_good_prices) / len(self.consumption_good_prices))
+        elif self.last_consumption_sellers:
+            return max(1, sum(seller.price for seller in self.last_consumption_sellers) / len(self.last_consumption_sellers))
+        return max(1, config.INITIAL_PRICE)
+
     
     def register_firm(self, firm):
         self.firms.append(firm)
@@ -118,9 +134,17 @@ class GlobalAccountingSystem:
 
     def reset_period_data(self):
         self.market_demand = [self.get_average_market_demand()]
-        self.capital_prices = [self.get_average_capital_price()]
-        self.wages = [self.get_average_wage()]
-        self.consumption_good_prices = [self.get_average_consumption_good_price()]
+        self.capital_prices = []
+        self.wages = []
+        self.consumption_good_prices = []
+        self.last_capital_sellers = []
+        self.last_labor_sellers = []
+        self.last_consumption_sellers = []
+
+    def update_sellers(self, capital_sellers, labor_sellers, consumption_sellers):
+        self.last_capital_sellers = capital_sellers
+        self.last_labor_sellers = labor_sellers
+        self.last_consumption_sellers = consumption_sellers
 
     # Adding missing methods based on the error message and potential needs
     def update_average_wage(self):

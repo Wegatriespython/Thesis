@@ -12,9 +12,12 @@ class Config:
         self.INITIAL_DEMAND = 5
         self.DEPRECIATION_RATE = 0.6
         self.MIN_DEMAND = 1
+        self.PRICE_ADJUSTMENT_FACTOR = 0.2
+        self.EXPECTED_PERIODS = 100
         self.INITIAL_SKILLS = .1
         self.DEMAND_ADJUSTMENT_RATE = 0.5 
         self.DISCOUNT_FACTOR = 0.95
+        self.DISCOUNT_RATE = 0.05
         self.DECISION_HORIZON = 100
         self.MARKUP_RATE = 0.2
         self.INITIAL_SAVINGS = 100

@@ -19,6 +19,10 @@ class Firm(Agent):
         self.labor_demand = 0
         self.investment_demand = 0
         self.accounts = AccountingSystem()
+        self.historic_sales = []
+        self.price_adjustment_factor = model.config.PRICE_ADJUSTMENT_FACTOR
+        self.expected_periods = model.config.EXPECTED_PERIODS
+        self.discount_rate = model.config.DISCOUNT_RATE
         print(f"Firm {unique_id} initialized:")
         print(f"  Capital: {self.capital}")
         print(f"  Productivity: {self.productivity}")
@@ -29,29 +33,39 @@ class Firm(Agent):
         self.depreciate_inventory()
         self.optimize_production()
         self.produce()
+        self.update_historic_sales()
         print(f"Firm {self.unique_id} decision - Labor Demand: {self.labor_demand}, Investment Demand: {self.investment_demand}, Production: {self.production}")
 
     def depreciate_inventory(self):
-        depreciation_amount = self.inventory * self.model.config.DEPRECIATION_RATE
-        self.inventory -= depreciation_amount
-        old_inventory_value = self.inventory_value
-        self.inventory_value = self.inventory * self.price
-        value_loss = old_inventory_value - self.inventory_value
-        self.budget -= value_loss
-        self.accounts.record_expense('inventory_depreciation', value_loss)
-        print(f"Firm {self.unique_id} depreciated inventory by {depreciation_amount:.2f} units, value loss: {value_loss:.2f}")
+        if self.inventory > 0:
+            depreciation_amount = self.inventory * self.model.config.DEPRECIATION_RATE
+            self.inventory = max(0, self.inventory - depreciation_amount)
+            old_inventory_value = self.inventory_value
+            self.inventory_value = self.inventory * self.price
+            value_loss = old_inventory_value - self.inventory_value
+            self.budget -= value_loss
+            self.accounts.record_expense('inventory_depreciation', value_loss)
+            print(f"Firm {self.unique_id} depreciated inventory by {depreciation_amount:.2f} units, value loss: {value_loss:.2f}")
+        else:
+            print(f"Firm {self.unique_id} has no inventory to depreciate.")
         
     def optimize_production(self):
-        optimal_labor, optimal_capital, optimal_price, optimal_production = neoclassical_profit_maximization(
-            self.budget, self.capital, len(self.workers), self.price, self.productivity,
-            self.calculate_expected_demand(), self.model.global_accounting.get_average_wage(), 
-            self.model.global_accounting.get_average_capital_price(), self.model.config.CAPITAL_ELASTICITY,
-            self.inventory, self.model.config.DEPRECIATION_RATE)
-        
-        self.adjust_labor(optimal_labor)
-        self.adjust_capital(optimal_capital)
-        self.price = optimal_price
-        self.production = optimal_production
+        try:
+            optimal_labor, optimal_capital, optimal_price, optimal_production = neoclassical_profit_maximization(
+                self.budget, self.capital, len(self.workers), self.price, self.productivity,
+                self.calculate_expected_demand(), self.model.global_accounting.get_average_wage(), 
+                self.model.global_accounting.get_average_capital_price(), self.model.config.CAPITAL_ELASTICITY,
+                self.inventory, self.model.config.DEPRECIATION_RATE, self.price_adjustment_factor,
+                self.expected_periods, self.discount_rate, self.historic_sales)
+            
+            self.adjust_labor(optimal_labor)
+            self.adjust_capital(optimal_capital)
+            self.price = optimal_price
+            self.production = optimal_production
+        except ValueError as e:
+            print(f"Optimization failed for Firm {self.unique_id}: {str(e)}")
+            # Fallback strategy: maintain current levels
+            self.production = self.calculate_production()
 
     def adjust_labor(self, optimal_labor):
         current_labor = len(self.workers)
@@ -73,8 +87,16 @@ class Firm(Agent):
         self.inventory += self.production
 
     def calculate_expected_demand(self):
+        if not self.historic_sales:
+            return self.model.global_accounting.get_average_market_demand()
+        avg_historic_sales = sum(self.historic_sales) / len(self.historic_sales)
         return (self.model.config.DEMAND_ADJUSTMENT_RATE * self.model.global_accounting.get_average_market_demand() + 
-                (1 - self.model.config.DEMAND_ADJUSTMENT_RATE) * self.demand)
+                (1 - self.model.config.DEMAND_ADJUSTMENT_RATE) * avg_historic_sales)
+
+    def update_historic_sales(self):
+        self.historic_sales.append(self.sales)
+        if len(self.historic_sales) > 10:  # Keep only last 10 periods
+            self.historic_sales.pop(0)
 
     def hire_worker(self, worker, wage):
         self.workers.append(worker)
@@ -117,6 +139,9 @@ class Firm(Agent):
     def get_max_capital_price(self):
         return self.budget / self.investment_demand if self.investment_demand > 0 else 0
 
+    def calculate_production(self):
+        return self.productivity * (self.capital ** self.model.config.CAPITAL_ELASTICITY) * (len(self.workers) ** (1 - self.model.config.CAPITAL_ELASTICITY))
+
 class Firm1(Firm):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model, model.config.FIRM1_INITIAL_CAPITAL, model.config.FIRM1_INITIAL_RD_INVESTMENT)
@@ -124,7 +149,6 @@ class Firm1(Firm):
     def step(self):
         self.innovate()
         super().step()
-
 
     def innovate(self):
         if self.model.random.random() < self.model.config.INNOVATION_ATTEMPT_PROBABILITY:
