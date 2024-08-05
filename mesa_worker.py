@@ -1,7 +1,6 @@
 from mesa import Agent
-from Accounting_System import AccountingSystem
-from utility_function import worker_decision
 import numpy as np
+from Config import Config
 
 class Worker(Agent):
     def __init__(self, unique_id, model):
@@ -12,47 +11,55 @@ class Worker(Agent):
         self.savings = model.config.INITIAL_SAVINGS
         self.skills = model.config.INITIAL_SKILLS
         self.consumption = model.config.INITIAL_CONSUMPTION
-        self.satiated = False
-        self.accounts = AccountingSystem()
-        self.wage_history = [model.config.MINIMUM_WAGE] * 5  # Initialize with minimum wage
-        self.expected_wage = model.config.MINIMUM_WAGE
-        self.historic_price = model.config.INITIAL_PRICE  # Add this line
-        self.price_history = [model.config.INITIAL_PRICE]  # Add this line
+        self.price_history = [model.config.INITIAL_PRICE]
+        self.wage_history = [model.config.MINIMUM_WAGE] * 5
+        self.mode = 'decentralized'
+        self.seller_prices = []
 
     def step(self):
-        self.update_expected_wage()
+        if self.mode == 'decentralized':
+            self.decentralized_step()
+        elif self.mode == 'centralized':
+            self.centralized_step()
+
+    def decentralized_step(self):
+        self.update_expectations()
         self.make_economic_decision()
         self.update_skills()
-        self.update_historic_price()  # Add this method call
 
+    def centralized_step(self):
+        # The central planner will call apply_central_decision()
+        self.update_skills()
 
-    def update_historic_price(self):
-        current_price = self.model.global_accounting.get_average_consumption_good_price()
-        self.price_history.append(current_price)
-        if len(self.price_history) > 10:  # Keep only last 10 periods
-            self.price_history.pop(0)
-        self.historic_price = sum(self.price_history) / len(self.price_history)
-    def update_expected_wage(self):
+    def update_expectations(self):
+        self.update_wage_expectation()
+        self.update_price_expectation()
+
+    def update_wage_expectation(self):
         if self.employed:
             self.wage_history.append(self.wage)
         else:
-            self.wage_history.append(0)  # Represent unemployment with 0 wage
-        
-        self.wage_history = self.wage_history[-5:]  # Keep only the last 5 periods
+            self.wage_history.append(0)
+        self.wage_history = self.wage_history[-5:]
         self.expected_wage = max(np.mean(self.wage_history), self.model.config.MINIMUM_WAGE)
 
+    def update_price_expectation(self):
+        if self.seller_prices:
+            current_price = np.mean(self.seller_prices)
+            self.price_history.append(current_price)
+            if len(self.price_history) > 10:
+                self.price_history.pop(0)
+            self.expected_price = np.mean(self.price_history)
+        else:
+            current_price = self.model.get_average_consumption_good_price()
+            self.price_history.append(current_price)
+            if len(self.price_history) > 10:
+                self.price_history.pop(0)
+            self.expected_price = np.mean(self.price_history)
     def make_economic_decision(self):
-        
-        current_price = max(self.model.global_accounting.get_average_consumption_good_price(), 1)
-        optimal_consumption, max_acceptable_price, desired_wage = worker_decision(
-            self.savings, self.wage, self.model.global_accounting.get_average_wage(),
-            self.model.global_accounting.get_average_consumption_good_price(),
-            self.historic_price
-        )
-        
-        self.consumption = optimal_consumption
-        self.price = max_acceptable_price
-        self.wage = desired_wage
+        # Simplified decision-making process
+        self.consumption = min(self.savings, self.expected_wage * self.model.config.CONSUMPTION_PROPENSITY)
+        self.wage = max(self.expected_wage, self.model.config.MINIMUM_WAGE)
 
     def update_skills(self):
         if self.employed:
@@ -64,7 +71,6 @@ class Worker(Agent):
         self.employed = True
         self.employer = employer
         self.wage = wage
-        self.accounts.record_income('wages', wage)
 
     def get_fired(self):
         self.employed = False
@@ -73,18 +79,31 @@ class Worker(Agent):
 
     def consume(self, quantity, price):
         total_cost = quantity * price
-        self.consumption += quantity
+        self.consumption = quantity
         self.savings -= total_cost
-        self.accounts.record_expense('consumption', total_cost)
-
-    def get_min_wage(self):
-        return max(self.model.config.MINIMUM_WAGE, self.wage * (1 - self.model.config.WAGE_ADJUSTMENT_RATE))
 
     def get_max_consumption_price(self):
-        return self.price
+        return self.expected_price * 1.1  # Willing to pay up to 10% more than expected
 
     def update_after_markets(self):
-        self.accounts.update_balance_sheet()
         if self.employed:
             self.savings += self.wage
         self.savings -= self.consumption * self.model.global_accounting.get_average_consumption_good_price()
+
+    def set_seller_prices(self, prices):
+        """
+        Set the current prices from sellers in the consumption market.
+
+        :param prices: List of prices from sellers in the consumption market
+        """
+        self.seller_prices = prices
+
+    def apply_central_decision(self, employment, wage, consumption):
+        self.employed = employment
+        self.wage = wage
+        self.consumption = consumption
+        if self.employed:
+            self.savings += self.wage
+        self.savings -= self.consumption  # Consumption good price is 1 (numeraire)
+        if not self.employed:
+            self.employer = None

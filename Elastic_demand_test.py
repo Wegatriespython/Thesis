@@ -26,9 +26,9 @@ class NeoclassicalFirm:
             expected_demand, avg_wage, avg_capital_price, 0.3,  # capital_elasticity
             self.inventory, 0.1,  # depreciation_rate
             0.2,  # price_adjustment_factor
-            5,  # expected_periods
+   
             0.05,  # discount_rate
-            self.historic_sales
+        
         )
         self.labor = optimal_labor
         self.capital = optimal_capital

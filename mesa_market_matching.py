@@ -1,71 +1,32 @@
-from typing import List, Tuple, NamedTuple, Any
+import numpy as np
 
-class Trader(NamedTuple):
-    price: float
-    quantity: int
-    id: str
-
-class Trade(NamedTuple):
-    buyer: str
-    seller: str
-    quantity: int
-    price: float
-
-def market_matching(buyers: List[Tuple[int, float, Any]], sellers: List[Tuple[int, float, Any]]) -> List[Tuple[Any, Any, int, float]]:
-    """
-    Match buyers and sellers based on their demand/supply and max/min prices.
-    
-    :param buyers: List of tuples (quantity, price, buyer_object)
-    :param sellers: List of tuples (quantity, price, seller_object)
-    :return: List of successful transactions (buyer_object, seller_object, quantity, price)
-    """
+def market_matching(buyers, sellers):
     # Sort buyers (descending) and sellers (ascending) by price
-    sorted_buyers = sorted(buyers, key=lambda x: x[1], reverse=True)
-    sorted_sellers = sorted(sellers, key=lambda x: x[1])
-
+    buyers.sort(key=lambda x: x[1], reverse=True)
+    sellers.sort(key=lambda x: x[1])
+    if not buyers or not sellers or buyers[0][1] < sellers[0][1]:
+        return []  # No trades possible
+    clearing_price = (buyers[0][1] + sellers[0][1]) / 2
+    total_supply = sum(seller[0] for seller in sellers)
     transactions = []
-    buyer_index, seller_index = 0, 0
+    remaining_supply = total_supply
+    buyer_index = 0
+    while remaining_supply > 0 and buyer_index < len(buyers):
+        for seller in sellers:
+            if remaining_supply == 0 or buyer_index >= len(buyers):
+                break
 
-    while buyer_index < len(sorted_buyers) and seller_index < len(sorted_sellers):
-        buyer_quantity, buyer_price, buyer_object = sorted_buyers[buyer_index]
-        seller_quantity, seller_price, seller_object = sorted_sellers[seller_index]
+            buyer = buyers[buyer_index]
+            trade_quantity = min(buyer[0], seller[0], remaining_supply)
 
-        if seller_price > buyer_price:
-            # No more viable trades possible
-            break
+            if trade_quantity > 0:
+                transactions.append((buyer[2], seller[2], trade_quantity, clearing_price))
+                remaining_supply -= trade_quantity
+                seller = (seller[0] - trade_quantity, seller[1], seller[2])
 
-        trade_quantity = min(buyer_quantity, seller_quantity)
-        if trade_quantity > 0:
-            transactions.append((buyer_object, seller_object, trade_quantity, seller_price))
+                if buyer[0] > trade_quantity:
+                    buyers[buyer_index] = (buyer[0] - trade_quantity, buyer[1], buyer[2])
+                else:
+                    buyer_index += 1
 
-            # Update quantities
-            sorted_buyers[buyer_index] = (buyer_quantity - trade_quantity, buyer_price, buyer_object)
-            sorted_sellers[seller_index] = (seller_quantity - trade_quantity, seller_price, seller_object)
-
-        # Move pointers if quantity is exhausted
-        if sorted_buyers[buyer_index][0] == 0:
-            buyer_index += 1
-        if sorted_sellers[seller_index][0] == 0:
-            seller_index += 1
-    print(f"Market Matching Input - Buyers: {buyers}, Sellers: {sellers}")
-    print(f"Market Matching Output - Transactions: {transactions}")
     return transactions
-
-# Test the function
-if __name__ == "__main__":
-    buyers = [(10, 1, "B1"), (9, 2, "B2"), (5, 3, "B3"), (4, 3, "B4"), (5, 3, "B5")]
-    sellers = [(11, 2, "S1"), (9, 3, "S2"), (8, 1, "S3")]
-
-    trades, unfulfilled_demand, unfulfilled_supply = market_matching(buyers, sellers)
-
-    print("Executed Trades:")
-    for trade in trades:
-        print(f"{trade.buyer} bought {trade.quantity} from {trade.seller} at price {trade.price}")
-
-    print("\nUnfulfilled Demand:")
-    for buyer in unfulfilled_demand:
-        print(f"{buyer.id}: {buyer.quantity} at {buyer.price}")
-
-    print("\nUnfulfilled Supply:")
-    for seller in unfulfilled_supply:
-        print(f"{seller.id}: {seller.quantity} at {seller.price}")

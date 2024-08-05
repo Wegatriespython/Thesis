@@ -1,0 +1,627 @@
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/ineqLognormal/bounds.gms
+
+$IFTHEN.INCONV %cm_INCONV_PENALTY% == "on"
+v02_sesoInconvPenSlack.lo(t,regi)=0;
+v02_inconvPenCoalSolids.fx("2005",regi) = 0;
+v02_inconvPenCoalSolids.lo(t,regi) = 0;
+v02_inconvPen.lo(t,regi) = 0;
+v02_inconvPen.fx("2005",regi) = 0;
+$ENDIF.INCONV
+
+*** EOF ./modules/02_welfare/ineqLognormal/bounds.gms
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/ineqLognormal/datainput.gms
+
+pm_welf(ttot)$(ttot.val ge 2005) = 1;
+$if %cm_less_TS% == "on"  pm_welf("2060") = 0.9;
+
+*RP* 2012-03-06: Inconvenience costs on seprod
+$IFTHEN.INCONV %cm_INCONV_PENALTY% == "on"
+p02_inconvpen_lap(ttot,regi,"coaltr")$(ttot.val ge 2005)      = 0.5;   !! In dollar per GJ seprod at 1.000$/cap GDP, or 10$/GJ at 10.000$_GDP/cap
+p02_inconvpen_lap(ttot,regi,"biotr")$(ttot.val ge 2005)       = 1.0;   !! In dollar per GJ seprod
+p02_inconvpen_lap(ttot,regi,"biotrmod")$(ttot.val ge 2005)    = 0.25;    !! In dollar per GJ seprod. Biotrmod is a mix of wood stoves and automated wood pellets for heating, which has lower air pollution and other discomfort effects
+*' Transformation of coal to liquids/gases/H2 brings local pollution, which is less accepted at higher incomes -> use the inconvenience cost channel
+p02_inconvpen_lap(ttot,regi,"coalftrec")$(ttot.val ge 2005)   = 0.9;    !! In dollar per GJ seprod
+p02_inconvpen_lap(ttot,regi,"coalftcrec")$(ttot.val ge 2005)  = 0.9;    !!  equivalent to 4$/GJ at 40.000$_GDP/cap, or 10$/GJ at 100.000$_GDP/cap
+p02_inconvpen_lap(ttot,regi,"coalgas")$(ttot.val ge 2005)   = 0.9;    !!
+p02_inconvpen_lap(ttot,regi,"coalh2")$(ttot.val ge 2005)   = 0.9;    !!
+p02_inconvpen_lap(ttot,regi,"coalh2c")$(ttot.val ge 2005)  = 0.9;    !!
+p02_inconvpen_lap(ttot,regi,te)$(ttot.val ge 2005) = p02_inconvpen_lap(ttot,regi,te) * 4.3 * 1E-4;            !! this is now equivalent to 1$/GJ at 1000$/per Capita in the welfare logarithm
+p02_inconvpen_lap(ttot,regi,te)$(ttot.val ge 2005) = p02_inconvpen_lap(ttot,regi,te) * (1/sm_giga_2_non) / sm_GJ_2_TWa; !! conversion util/(GJ/cap) -> util/(TWa/Gcap)
+*RP* these values are all calculated on seprod level.
+display p02_inconvpen_lap;
+$ENDIF.INCONV
+
+*BS* 2020-03-12: additional inputs for inequality
+* To Do: rename file, then also in "files" and moinput::fullREMIND.R
+parameter f02_ineqTheil(tall,all_regi,all_GDPscen)        "Gini data"
+/
+$ondelim
+$include "./modules/02_welfare/ineqLognormal/input/f_ineqTheil.cs4r"
+$offdelim
+/
+;
+p02_ineqTheil(ttot,regi)$(ttot.val ge 2005) = f02_ineqTheil(ttot,regi,"%cm_GDPscen%");
+display p02_ineqTheil;
+
+
+* for a policy run, we need to load values coming from the baseline for consumption, tax revenues and energy expenditures:
+if ((cm_emiscen ne 1),
+    Execute_Loadpoint 'input_ref' p02_taxrev_redistr0_ref=v02_taxrev_Add.l;
+    Execute_Loadpoint 'input_ref' p02_cons_ref=vm_cons.l;
+    Execute_Loadpoint 'input_ref' p02_energyExp_ref=v02_energyExp.l;
+    Execute_Loadpoint 'input_ref' p02_damageFactor_ref=vm_damageFactor.l;
+ 
+* if energy system costs are used:
+*    Execute_Loadpoint 'input_ref' p02_energyExp_ref=vm_costEnergySys.l;
+   
+);
+
+* income elasticity of tax revenues redistribution.
+p02_distrBeta(ttot,regi)$(ttot.val ge 2005) = cm_distrBeta;
+
+
+* for a baseline we need the following variables to be 0:
+p02_energyExp_ref(ttot,regi)$(cm_emiscen eq 1)=0;
+p02_taxrev_redistr0_ref(ttot,regi)$(cm_emiscen eq 1)=0;
+v02_taxrev_Add.l(ttot,regi)$(cm_emiscen eq 1)=0;
+v02_energyExp_Add.l(ttot,regi)$(cm_emiscen eq 1)=0;
+v02_energyexpShare.l(ttot,regi)$(cm_emiscen eq 1)=0;
+v02_revShare.l(ttot,regi)$(cm_emiscen eq 1)=0;
+
+* For runs that are not baseline, we need to initialize:
+* taxrev_Add, because they are used in the condition sign:
+v02_taxrev_Add.l(ttot,regi)$(cm_emiscen ne 1)=0;
+* and v02_energyExp to the level in the baseline so the model can have a start value
+v02_energyExp.l(ttot,regi)$(cm_emiscen eq 1)=p02_energyExp_ref(ttot,regi)$(cm_emiscen eq 1);
+
+*parameters for translating output damage into consumption loss
+parameter f02_damConsFactor(all_regi,dam_factors)    "for translating output to consumption losses from KW damage function"
+/
+$ondelim
+$include "./modules/02_welfare/ineqLognormal/input/damage2consumption_loss_coefs_noscen.inc"
+$offdelim
+/
+;
+
+p02_damConsFactor1(ttot,regi)=f02_damConsFactor(regi,"f1");
+p02_damConsFactor2(ttot,regi)=f02_damConsFactor(regi,"f2");
+
+*** EOF ./modules/02_welfare/ineqLognormal/datainput.gms
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/ineqLognormal/declarations.gms
+
+***-------------------------------------------------------------------------------
+***                                   PARAMETERS
+***-------------------------------------------------------------------------------
+parameters
+pm_welf(tall)                                     "Weight parameter in the welfare function to avoid jumps with cm_less_TS"
+pm_w(all_regi)                                    "Negishi weights"
+pm_prtp(all_regi)                                 "Pure rate of time preference"
+p02_cons_ref(ttot,all_regi)                        "consumption in reference run"
+p02_damageFactor_ref(ttot,all_regi)               "damage factor in reference run"
+p02_ineqTheil(ttot,all_regi)		                   "regional Theil-T index = sigma^2/2 for lognormal"
+p02_distrMu(ttot,all_regi)                         "mu of lognormal distribution (prior to mitigation costs)"
+p02_distrSigma(ttot,all_regi)                      "sigma of lognormal distribution (prior to mitigation costs)"
+p02_distrAlpha(ttot,all_regi)                      "income elasticity of mitigation costs"
+p02_distrBeta(ttot,all_regi)                       "income elasticity of revenues redistribution"
+
+p02_taxrev_redistr0_ref(ttot,all_regi)             "tax revenue in the reference run"
+p02_energyExp_ref(ttot,all_regi)                     "regional energy expenditure in the reference scenario "
+p02_prodFe_ref(ttot,all_regi,all_enty,all_enty,all_te) "final energy in ref"
+
+p02_damConsFactor1(ttot,all_regi)		"factor translating output damages to consumption losses"
+p02_damConsFactor2(ttot,all_regi)		"factor translating output damages to consumption losses"
+pm_sccIneq(tall,all_regi)			"inequality term in SCC calculation"
+
+$ifthen.inconv %cm_INCONV_PENALTY% == "on"
+p02_inconvpen_lap(ttot,all_regi,all_te)           "Parameter for inconvenience penalty for local air pollution. [T$/TWa at Consumption of 1000$/cap]"
+$endif.inconv
+
+$IFTHEN.INCONV_bioSwitch "%cm_INCONV_PENALTY_FESwitch%" == "on"
+p02_inconvPen_Switch_Track(ttot,all_regi)                       "Parameter to track magnitude of inconvenience penalty for bio/synfuel share switching [share of consumption]"
+$ENDIF.INCONV_bioSwitch
+;
+
+***-------------------------------------------------------------------------------
+***                                   VARIABLES
+***-------------------------------------------------------------------------------
+variables
+v02_welfare(all_regi)                             "Regional welfare"
+vm_welfareGlob                                    "Global welfare"
+v02_taxrev_Add(ttot,all_regi)                     "tax revenue w.r.t. reference run"
+v02_energyExp(ttot,all_regi)                      "regional energy expenditure "
+v02_energyexpShare(ttot,all_regi)                 "relative additional energy expenditure w.r.t. reference run"
+v02_emitaxredistr(ttot,all_regi)                  "emissions that will be taxes and redistributed"
+v02_revShare(ttot,all_regi)                       "tax revenues (share of consumption)"
+v02_energyExp_Add(ttot,all_regi)                  "additional energy expenditure w.r.t. reference run"
+v02_distrAlpha(ttot,all_regi)                     "income elasticity of mitigation costs"
+v02_damageConsShare(ttot,all_regi)		  "share of consumption loss from damages in consumption"
+
+
+$ifthen.inconv %cm_INCONV_PENALTY% == "on"
+v02_inconvPen(ttot,all_regi)                      "Inconvenience penalty in the welfare function, e.g. for air pollution. Unit: ?Utils?"
+v02_inconvPenCoalSolids(ttot,all_regi)            "Inconvenience penalty in the welfare function, e.g. for air pollution. Unit: ?Utils?"
+v02_sesoInconvPenSlack(ttot,all_regi)             "Slack to avoid negative inconvenience penalty for Coal Solids"
+$endif.inconv
+;
+
+positive variables
+v02_distrFinal_sigmaSq(ttot,all_regi)                  "sigma^2 parameter of final lognormal distribution (after redistributional effects of taxes)"
+v02_distrFinal_sigmaSq_postDam(ttot,all_regi)                  "sigma^2 parameter of final lognormal distribution (after redistributional effects of taxes and damages)"
+v02_distrFinal_sigmaSq_limit(ttot,all_regi)        "Limit past which inequality improvements do not lead to welfare benefits"
+v02_distrFinal_sigmaSq_welfare(ttot,all_regi)       "sigma^2 entering welfare"
+
+$IFTHEN.INCONV_bioSwitch "%cm_INCONV_PENALTY_FESwitch%" == "on"
+v02_NegInconvPenFeBioSwitch(ttot,all_regi,all_enty,all_enty,emi_sectors,all_emiMkt) "Negative inconvenience penalty in the welfare function for bio/synfuel shares switch between sectors and emissions markets"
+v02_PosInconvPenFeBioSwitch(ttot,all_regi,all_enty,all_enty,emi_sectors,all_emiMkt) "Positive inconvenience penalty in the welfare function for bio/synfuel shares switch between sectors and emissions markets"
+$ENDIF.INCONV_bioSwitch
+;
+
+***-------------------------------------------------------------------------------
+***                                   EQUATIONS
+***-------------------------------------------------------------------------------
+equations
+q02_welfareGlob                                   "Global welfare"
+q02_welfare                                       "Regional welfare"
+q02_energyExp(ttot,all_regi)                      "regional energy expenditure "
+q02_emitaxredistr(ttot,all_regi)                  "emissions that will be taxes and redistributed"
+q02_energyexpShare(ttot,all_regi)                    "additional energy exp w.r.t. reference run as a share of consumption"
+q02_relTaxlevels(ttot,all_regi)                    "relative tax revenues "
+q02_taxrev_Add(ttot,all_regi)                      "tax revenue w.r.t. reference run"
+
+q02_energyExp_Add(ttot,all_regi)                       "regional additional energy expenditure w.r.t. reference run"
+
+q02_consLossShare(ttot,all_regi)		"share of consumption loss from damages"
+
+q02_distrAlpha(ttot,all_regi)                      "income elasticity of mitigation costs"
+
+q02_energyexpShare_cap(ttot,all_regi)               "cap energy expenditure share"
+
+q02_distrFinal_sigmaSq(ttot,all_regi)             "sigma^2 parameter of lognormal final distribution (after costs and taxes)"
+q02_distrFinal_sigmaSq_postDam(ttot,all_regi)             "sigma^2 parameter of lognormal final distribution (after costs, taxes and damages)"
+q02_distrFinal_sigmaSq_limit(ttot,all_regi)        "sigma limit"
+q02_distrFinal_sigmaSq_welfare(ttot,all_regi)	"sigma^2 entering welfare equation after applying the limit"
+
+q02_budget_first(ttot,all_regi)                 "making sure budget is positive"
+q02_budget_second(ttot,all_regi)                 "making sure budget is positive"
+
+
+$ifthen.inconv %cm_INCONV_PENALTY% == "on"
+q02_inconvPen(ttot,all_regi)                      "Calculate the inconvenience penalty v02_inconvPen"
+q02_inconvPenCoalSolids(ttot,all_regi)            "Calculate the inconvenience penalty v02_inconvPen"
+$endif.inconv
+
+$IFTHEN.INCONV_bioSwitch "%cm_INCONV_PENALTY_FESwitch%" == "on"
+q02_inconvPenFeBioSwitch(ttot,all_regi,all_enty,all_enty,all_te,emi_sectors,all_emiMkt)  "Calculate the inconvenience penalty to avoid switching biomass and synfuel shares in hydrocarbons in buildings, transport and industry and emissions markets if costs are relatively close"
+$ENDIF.INCONV_bioSwitch
+
+;
+*** EOF ./modules/02_welfare/ineqLognormal/declarations.gms
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/ineqLognormal/equations.gms
+
+*' @equations
+***---------------------------------------------------------------------------
+*' The objective of the optimization is to maximize the total discounted intertemporal utility.
+*' It is summed over all regions.
+***---------------------------------------------------------------------------
+q02_welfareGlob..
+    vm_welfareGlob
+  =e=
+    sum(regi, pm_w(regi)*v02_welfare(regi) )
+;
+
+***---------------------------------------------------------------------------
+*' Total discounted intertemporal regional welfare calculated from per capita
+*' consumption summing over all time steps taking into account the pure time
+*' preference rate. Assuming an intertemporal elasticity of substitution of 1,
+*' it holds:
+***---------------------------------------------------------------------------
+q02_welfare(regi) ..
+  v02_welfare(regi)
+  =e=
+    sum(ttot$( ttot.val ge 2005 ),
+      pm_welf(ttot)
+    * pm_ts(ttot)
+    / ((1 + pm_prtp(regi)) ** (pm_ttot_val(ttot) - 2005))
+    * ( ( pm_pop(ttot,regi)
+        * ( ( ( ( (  vm_cons(ttot,regi)
+          * exp(
+              -0.5 
+            * (1 / pm_ies(regi))
+            * v02_distrFinal_sigmaSq_welfare(ttot,regi)
+            )
+          )
+        / pm_pop(ttot,regi)
+        )
+         ** (1 - 1 / pm_ies(regi))
+          - 1
+          )
+        / (1 - 1/pm_ies(regi)) 
+        )$( pm_ies(regi) ne 1 )
+      + ( log((vm_cons(ttot,regi)) / pm_pop(ttot,regi))
+        - 0.5 * v02_distrFinal_sigmaSq_welfare(ttot,regi)
+        )$( pm_ies(regi) eq 1 )
+          )
+        )
+$ifthen %cm_INCONV_PENALTY% == "on"
+      - v02_inconvPen(ttot,regi) - v02_inconvPenCoalSolids(ttot,regi)
+$endif
+$ifthen "%cm_INCONV_PENALTY_FESwitch%" == "on"
+      - sum((entySe,entyFe,te,sector,emiMkt)$(
+                                    se2fe(entySe,entyFe,te)
+                                AND entyFe2Sector(entyFe,sector)
+                                AND sector2emiMkt(sector,emiMkt) 
+                                AND (entySeBio(entySe) OR  entySeFos(entySe)) ),
+          v02_NegInconvPenFeBioSwitch(ttot,regi,entySe,entyFe,sector,emiMkt)
+    + v02_PosInconvPenFeBioSwitch(ttot,regi,entySe,entyFe,sector,emiMkt)
+    )
+      / 1e3	
+$endif
+      )
+    )
+;
+
+***---------------------------------------------------------------------------
+*' Defining variables which are useful for the inequality module:
+*' 1/ Energy Expenditures
+*' 2/ Revenues from taxes
+***---------------------------------------------------------------------------
+
+*** uses max(2015,cm_startyear) because energy expenditure not working before 2015 in the baseline scenario b/c prices not defined before(?)
+q02_energyExp(ttot,regi)$(ttot.val ge max(2015,cm_startyear))..
+    v02_energyExp(ttot,regi)
+    =e=
+    sum(se2fe(entySe,entyFe,te),
+        sum((sector2emiMkt(sector,emiMkt),entyFe2Sector(entyFe,sector)),
+        vm_demFeSector(ttot,regi,entySe,entyFe,sector,emiMkt)*pm_FEPrice(ttot,regi,entyFe,sector,emiMkt))
+        )
+;
+
+*** 2/ Emissions which will generate revenues, following the way emissions are summed in q_emiAllMkt while only retaining specific sources (see documentation)
+*ML* In the future: try to remove non-energy emissions from FF and industry?
+q02_emitaxredistr(ttot,regi)$(ttot.val ge cm_startyear)..
+    v02_emitaxredistr(ttot,regi)
+    =e=
+*** Summing on all markets energy emissions as well as CDR emissions.
+    sum(emiMkt, 
+    vm_emiTeMkt(ttot,regi,"co2",emiMkt)+vm_emiCdr(ttot,regi,"co2")$(sameas(emiMkt,"ETS"))
+    + sm_tgn_2_pgc   * (vm_emiTeMkt (ttot,regi,"n2o",emiMkt)+vm_emiCdr(ttot,regi,"n2o")$(sameas(emiMkt,"ETS")))
+    + sm_tgch4_2_pgc * (vm_emiTeMkt (ttot,regi,"ch4",emiMkt)+vm_emiCdr(ttot,regi,"ch4")$(sameas(emiMkt,"ETS")))
+   )
+*** Plus all non-energy emissions sources coming from FF and industrial processes:
+   	+ vm_emiMacSector(ttot,regi,"co2cement_process")
+    + sm_tgch4_2_pgc*(vm_emiMacSector(ttot,regi,"ch4coal")+vm_emiMacSector(ttot,regi,"ch4gas")+vm_emiMacSector(ttot,regi,"ch4oil"))
+    + sm_tgn_2_pgc*(vm_emiMacSector(ttot,regi,"n2otrans")+vm_emiMacSector(ttot,regi,"n2oadac")+vm_emiMacSector(ttot,regi,"n2onitac"))
+;
+
+*' @stop
+
+***---------------------------------------------------------------------------
+*' Variables affecting inequalities:
+*' 1/ Additional energy expenditures,
+*' 2/ Additional revenues from the carbon tax
+***---------------------------------------------------------------------------
+
+*** This equation defines additional energy expenditure compared to baseline
+
+q02_energyExp_Add(ttot,regi)$(ttot.val ge cm_startyear)..
+    v02_energyExp_Add(ttot,regi)
+  =e=
+*** Preferred expression using energy expenditures (defined in the core)
+*** It is worth 0 in the baseline (cm_emiscen=1)
+    (v02_energyExp(ttot,regi)-p02_energyExp_ref(ttot,regi))$(cm_emiscen ne 1)
+*** Another expression (if we wanted to use energy system costs)
+*** In that case adjust also the expression for p02_energyExp_ref in datainput
+***    (vm_costEnergySys(ttot,regi)-p02_energyExp_ref(ttot,regi))$(cm_emiscen ne 1)
+;
+
+*** This equation the ratio of additional energy expenditures over consumption
+q02_energyexpShare(ttot,regi)$(ttot.val ge cm_startyear)..
+    v02_energyexpShare(ttot,regi)
+  =e=
+*** simply divided by conso
+    v02_energyExp_Add(ttot,regi)/(p02_cons_ref(ttot,regi))
+***    v02_energyExp_Add(ttot,regi)/(vm_cons(ttot,regi))
+*** divided by adjusted conso
+***    (v02_energyExp_Add(ttot,regi))/(vm_cons(ttot,regi)+v02_energyExp_Add(ttot,regi)-v02_taxrev_Add(ttot,regi)$(v02_taxrev_Add.l(ttot,regi) ge 0))
+
+;
+
+*** Similarly to energy expenditure, we define the additional revenues compared to the baseline
+q02_taxrev_Add(ttot,regi)$(ttot.val ge cm_startyear)..
+    v02_taxrev_Add(ttot,regi)
+  =e=
+    ((pm_taxCO2eq(ttot,regi) + pm_taxCO2eqRegi(ttot,regi) + pm_taxCO2eqSCC(ttot,regi))*v02_emitaxredistr(ttot,regi)
+    -p02_taxrev_redistr0_ref(ttot,regi))$(cm_emiscen ne 1)
+;
+
+*** We use the ratio over consumption
+*** In addition, we suppose that this is worth 0 in case revenues are negative (subsidies to negative emission technologies)
+q02_relTaxlevels(ttot,regi)$(ttot.val ge cm_startyear)..
+    v02_revShare(ttot,regi)
+  =e=
+*** Simply divided by conso
+    v02_taxrev_Add(ttot,regi)$(v02_taxrev_Add.l(ttot,regi) ge 0)/p02_cons_ref(ttot,regi)
+***    v02_taxrev_Add(ttot,regi)$(v02_taxrev_Add.l(ttot,regi) ge 0)/vm_cons(ttot,regi)
+
+*** Divided by adjusted conso
+***    (v02_taxrev_Add(ttot,regi)$(v02_taxrev_Add.l(ttot,regi) ge 0))/(vm_cons(ttot,regi)+v02_energyExp_Add(ttot,regi)-v02_taxrev_Add(ttot,regi)$(v02_taxrev_Add.l(ttot,regi) ge 0))
+
+;
+
+*** output damages calculated in the damage module are translated into consumption losses via an exogenous factor
+q02_consLossShare(ttot,regi)$(ttot.val ge cm_startyear)..
+    v02_damageConsShare(ttot,regi)
+  =e=
+    vm_cons(ttot,regi)/((p02_damConsFactor1(ttot,regi)+vm_damageFactor(ttot,regi)*p02_damConsFactor2(ttot,regi))*p02_cons_ref(ttot,regi))-vm_cons(ttot,regi)/p02_cons_ref(ttot,regi)
+***    1/(p02_damConsFactor1(ttot,regi)+vm_damageFactor(ttot,regi)*p02_damConsFactor2(ttot,regi))-1
+;
+
+*** Alpha, the elasticity of energy expenditure, depends upon the region's GDP
+*** We use the functional form and calibration from Soergel et al. 2021    
+q02_distrAlpha(ttot,regi)$(ttot.val ge cm_startyear)..
+    v02_distrAlpha(ttot,regi)
+    =e=
+    1+1.618788-2*0.09746092*log(1000*(vm_cesIO(ttot,regi,"inco")/pm_shPPPMER(regi)*vm_damageFactor(ttot,regi))/pm_pop(ttot,regi))
+***    1+1.618788-2*0.09746092*log(1000*vm_cesIO(ttot,regi,"inco")/pm_pop(ttot,regi))
+*** Note that the above equation defines alpha as a parameter depending upon GDP, which could potentially bring a complex feedback (rich countries moderating GDP growth to reduce the regressivity of energy expenditures).
+*** For tests, I also used previously consumption in the baseline instead of actual GDP in the current scenario, so that alpha is a parameter
+***    1+1.618788-2*0.09746092*log(1000*p02_cons_ref(ttot,regi)/pm_pop(ttot,regi))
+;
+
+***---------------------------------------------------------------------------
+*' Defining sigma
+***---------------------------------------------------------------------------
+
+***  Equation defining sigma:
+*** q02_distrFinal_sigmaSq(ttot,regi)..
+q02_distrFinal_sigmaSq(ttot,regi)$(ttot.val ge cm_startyear)..
+    v02_distrFinal_sigmaSq(ttot,regi)
+  =e=
+*** Solution 1: This is the complex equation 
+***    log( exp(2*p02_ineqTheil(ttot,regi))
+***      - 2* v02_energyexpShare(ttot,regi) * exp(2*p02_ineqTheil(ttot,regi)*v02_distrAlpha(ttot,regi))
+***      + 2* v02_revShare(ttot,regi) * exp(2*p02_ineqTheil(ttot,regi)*p02_distrBeta(ttot,regi))
+***      + power(v02_energyexpShare(ttot,regi),2)* exp(2*p02_ineqTheil(ttot,regi)*power(v02_distrAlpha(ttot,regi),2))
+***      + power(v02_revShare(ttot,regi),2)*exp(2*p02_ineqTheil(ttot,regi)*power(p02_distrBeta(ttot,regi),2))
+***      - 2* v02_energyexpShare(ttot,regi)*v02_revShare(ttot,regi)*exp(2*p02_ineqTheil(ttot,regi)*v02_distrAlpha(ttot,regi)*p02_distrBeta(ttot,regi)))
+***    -2*log(1-v02_energyexpShare(ttot,regi)+v02_revShare(ttot,regi))
+
+*** Solution 2: The simple equation
+    2*p02_ineqTheil(ttot,regi)*power((1+p02_distrBeta(ttot,regi)*v02_revShare(ttot,regi)-v02_distrAlpha(ttot,regi)*v02_energyexpShare(ttot,regi))/(1+v02_revShare(ttot,regi)-v02_energyexpShare(ttot,regi)),2)
+
+;
+
+***-- including damage effects in sigma ---
+q02_distrFinal_sigmaSq_postDam(ttot,regi)$(ttot.val ge cm_startyear)..
+   v02_distrFinal_sigmaSq_postDam(ttot,regi)
+ =e=
+    2*p02_ineqTheil(ttot,regi)*power((1+p02_distrBeta(ttot,regi)*v02_revShare(ttot,regi)-v02_distrAlpha(ttot,regi)*v02_energyexpShare(ttot,regi)-cm_distrAlphaDam*v02_damageConsShare(ttot,regi))/(1+v02_revShare(ttot,regi)-v02_energyexpShare(ttot,regi)-v02_damageConsShare(ttot,regi)),2)
+;
+
+***---------------------------------------------------------------------------
+*' Defining a boundary to prevent welfare-enhancing effects
+***---------------------------------------------------------------------------
+
+*** I define sigma_limit as a limit past which increases in inequality do not bring further welfare benefits
+
+q02_distrFinal_sigmaSq_limit(ttot,regi)$(ttot.val ge cm_startyear)..
+*** solution one_ the limit is such that the bottom 40% should not have more than in the baseline
+***    p02_cons_ref(ttot,regi)*(1+errorf((-0.253347-sqrt(p02_ineqTheil(ttot,regi)))/sqrt(2)))
+***    =e=
+***    vm_cons(ttot,regi)*(1+errorf((-0.253347-0.5*v02_distrFinal_sigmaSq_limit(ttot,regi))/sqrt(2)))
+    
+*** solution two: the limit is the level of inequality in the baseline
+    v02_distrFinal_sigmaSq_limit(ttot,regi)
+        =e=
+    2*p02_ineqTheil(ttot,regi)
+;
+
+*** I define sigmaSq_welfare as the maximum of sigmaSq and sigmaSq_limit
+*** To do that I use a smooth approximation of the welfare function
+*** FP: adjust to use the post damage Sigma
+***q02_distrFinal_sigmaSq_welfare(ttot,regi)$(ttot.val ge 2015)..
+q02_distrFinal_sigmaSq_welfare(ttot,regi)$(ttot.val ge cm_startyear)..
+    v02_distrFinal_sigmaSq_welfare(ttot,regi)
+        =e=
+    0.5*(v02_distrFinal_sigmaSq_postDam(ttot,regi)+v02_distrFinal_sigmaSq_limit(ttot,regi)+sqrt(power(v02_distrFinal_sigmaSq_postDam(ttot,regi)-v02_distrFinal_sigmaSq_limit(ttot,regi),2)+0.00001))
+***    0.5*(v02_distrFinal_sigmaSq(ttot,regi)+v02_distrFinal_sigmaSq_limit(ttot,regi)+sqrt(power(v02_distrFinal_sigmaSq(ttot,regi)-v02_distrFinal_sigmaSq_limit(ttot,regi),2)+0.00001))
+
+*** test: sigma welfare equal to the level in the baseline...
+***    2*p02_ineqTheil(ttot,regi)
+
+*** another test: sigma welfare always equal to sigma (no limit)
+***    v02_distrFinal_sigmaSq(ttot,regi)      
+;
+
+***---------------------------------------------------------------------------
+*' Adding other boundaries to prevent model from failing
+***---------------------------------------------------------------------------
+
+*** For tests (maybe not needed anymore)
+
+*** To make sure the energy expenditure share stays within reasonable boundaries, I defined the following inequality:
+q02_energyexpShare_cap(ttot,regi)$(ttot.val ge cm_startyear)..
+    v02_energyexpShare(ttot,regi)
+     =l=
+    0.5
+;
+
+*** To prevent the "complex" equation defining sigma to fail, one can use inequalities to make sure what is within the log is positive
+
+q02_budget_first(ttot,regi)$(ttot.val ge cm_startyear)..
+*** Note that v02_budget_first is defined as a positive variable
+***    v02_budget_first(ttot,regi)
+***     =e=
+***      exp(2*p02_ineqTheil(ttot,regi))
+***      - 2* v02_energyexpShare(ttot,regi) * exp(2*p02_ineqTheil(ttot,regi)*v02_distrAlpha(ttot,regi))
+***      + 2* v02_revShare(ttot,regi) * exp(2*p02_ineqTheil(ttot,regi)*p02_distrBeta(ttot,regi))
+***      + power(v02_energyexpShare(ttot,regi),2)* exp(2*p02_ineqTheil(ttot,regi)*power(v02_distrAlpha(ttot,regi),2))
+***      + power(v02_revShare(ttot,regi),2)*exp(2*p02_ineqTheil(ttot,regi)*power(p02_distrBeta(ttot,regi),2))
+***      - 2* v02_energyexpShare(ttot,regi)*v02_revShare(ttot,regi)*exp(2*p02_ineqTheil(ttot,regi)*v02_distrAlpha(ttot,regi)*p02_distrBeta(ttot,regi))
+*** minus a epsilon to make sure
+***      -0.0001
+
+*** At the moment I removed this so use use instead
+    0
+    =l=
+    1
+
+;
+
+*** Similar equation for the other expression within the log
+***q02_budget_second(ttot,regi)..
+q02_budget_second(ttot,regi)$(ttot.val ge cm_startyear)..
+***    v02_budget_second(ttot,regi)
+***     =e=
+    0
+    =l=
+    (1+v02_revShare(ttot,regi)-v02_energyexpShare(ttot,regi)-0.05)
+;
+
+***---------------------------------------------------------------------------
+*' Calculation of the inconvenience penalty:
+***---------------------------------------------------------------------------
+$IFTHEN.INCONV %cm_INCONV_PENALTY% == "on"
+q02_inconvPen(t,regi)$(t.val > 2005)..
+    v02_inconvPen(t,regi)
+  =g=
+*' local air pollution for all entySe production except for coal solids (=sesofos), which is treated separately (see below)
+    SUM(pe2se(enty,entySe,te)$(NOT sameas(entySe,"sesofos")),
+        p02_inconvpen_lap(t,regi,te) * (vm_prodSe(t,regi,enty,entySe,te))
+    )
+;
+
+q02_inconvPenCoalSolids(t,regi)$(t.val > 2005)..
+    v02_inconvPenCoalSolids(t,regi)
+  =g=
+*' local air pollution for coal: inconvinienve penalty applies only for buildings use; slack variable ensures that v02_inconvPen can stay > 0
+    p02_inconvpen_lap(t,regi,"coaltr") * (vm_prodSe(t,regi,"pecoal","sesofos","coaltr")
+  - vm_cesIO(t,regi,"fesoi"))
+  + v02_sesoInconvPenSlack(t,regi)
+;
+$ENDIF.INCONV
+
+*** small inconvenience penalty for increasing/decreasing biomass/synfuel use
+*** between two time steps in buildings and industry and emissison markets
+*** necessary to avoid switching behavior in sectors and emissions markets
+*** between time steps as those sectors and markets do not have se2fe capcities
+$IFTHEN.INCONV_bioSwitch "%cm_INCONV_PENALTY_FESwitch%" == "on"
+q02_inconvPenFeBioSwitch(ttot,regi,entySe,entyFe,te,sector,emiMkt)$(
+                                  ttot.val ge cm_startyear
+                              AND se2fe(entySe,entyFe,te) 
+                              AND entyFe2Sector(entyFe,sector) 
+                              AND sector2emiMkt(sector,emiMkt) 
+                              AND (entySeBio(entySe) OR  entySeFos(entySe)) ) ..
+    vm_demFeSector(ttot,regi,entySe,entyFe,sector,emiMkt) 
+  - vm_demFeSector(ttot-1,regi,entySe,entyFe,sector,emiMkt)
+  + v02_NegInconvPenFeBioSwitch(ttot,regi,entySe,entyFe,sector,emiMkt)
+  - v02_PosInconvPenFeBioSwitch(ttot,regi,entySe,entyFe,sector,emiMkt)
+  =e=
+  0
+;
+$ENDIF.INCONV_bioSwitch
+*** EOF ./modules/02_welfare/ineqLognormal/equations.gms
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/ineqLognormal/postsolve.gms
+
+$IFTHEN.INCONV_bioSwitch "%cm_INCONV_PENALTY_FESwitch%" == "on"
+*** track inconvenience penalty for bio/synfuel switching to check how large it
+*** is relative to consumption
+p02_inconvPen_Switch_Track(t,regi)
+  = sum((entySe,entyFe,te,sector,emiMkt)$(
+                                    se2fe(entySe,entyFe,te) 
+                                AND entyFe2Sector(entyFe,sector) 
+                                AND sector2emiMkt(sector,emiMkt) 
+                                AND (entySeBio(entySe) OR  entySeFos(entySe) )), 
+      v02_NegInconvPenFeBioSwitch.l(t,regi,entySe,entyFe,sector,emiMkt) 
+    + v02_PosInconvPenFeBioSwitch.l(t,regi,entySe,entyFe,sector,emiMkt)
+    )
+  / 1e3;
+$ENDIF.INCONV_bioSwitch
+
+*for use in the SCC calculation
+pm_sccIneq(ttot,regi)$((pm_SolNonInfes(regi) eq 1)) = exp(-1*(2*cm_distrAlphaDam-(pm_ies(regi)+1))*0.5*pm_ies(regi)*v02_distrFinal_sigmaSq_postDam.l(ttot,regi));
+
+*interpolate sigma
+loop(ttot$(ttot.val ge 2005),
+	loop(tall$(pm_tall_2_ttot(tall, ttot)),
+	    pm_sccIneq(tall,regi) =
+		(1- pm_interpolWeight_ttot_tall(tall)) * pm_sccIneq(ttot,regi)
+		+ pm_interpolWeight_ttot_tall(tall) * pm_sccIneq(ttot+1,regi);
+));
+
+* assume sigma is flat from 2150 on (only enters damage calculations in the far future)
+pm_sccIneq(tall,regi)$(tall.val ge 2150) = pm_sccIneq("2149",regi); 
+
+*** EOF ./modules/02_welfare/ineqLognormal/postsolve.gms
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/ineqLognormal/realization.gms
+
+*' @description
+*' The ineqLognormal realization adds a representation of subregional inequality to the welfare equation. This is determined by the SSP-based Gini projections by Rao et al. and modified by the effects of climate damages and energy expenditure changes due to climate policy. It is also affected by the redistribution of carbon tax revenues, which can be distributed either proportional to income (distributionally neutral) or on an equal-per-capita basis.
+*####################### R SECTION START (PHASES) ##############################
+$Ifi "%phase%" == "sets" $include "./modules/02_welfare/ineqLognormal/sets.gms"
+$Ifi "%phase%" == "declarations" $include "./modules/02_welfare/ineqLognormal/declarations.gms"
+$Ifi "%phase%" == "datainput" $include "./modules/02_welfare/ineqLognormal/datainput.gms"
+$Ifi "%phase%" == "equations" $include "./modules/02_welfare/ineqLognormal/equations.gms"
+$Ifi "%phase%" == "bounds" $include "./modules/02_welfare/ineqLognormal/bounds.gms"
+$Ifi "%phase%" == "postsolve" $include "./modules/02_welfare/ineqLognormal/postsolve.gms"
+*######################## R SECTION END (PHASES) ###############################
+*** EOF ./modules/02_welfare/ineqLognormal/realization.gms
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/ineqLognormal/sets.gms
+
+sets
+damscens "scenarios for which the conversion factor from output to consumption loss is available"
+/SSP2EU-Base-IMCP-KWdamage,SSP2EU-NDC-IMCP-KWdamage,SSP2EU-PkBudg1150-IMCP-KWdamage_notInternalized,SSP2EU-PkBudg650-IMCP-KWdamage_notInternalized/
+
+dam_factors "damage conversion factors output to consumption"
+/f1,f2/
+;
+
+*** EOF ./modules/02_welfare/ineqLognormal/sets.gms

@@ -1,0 +1,175 @@
+import unittest
+import numpy as np
+from Simple_profit_maxxing import neoclassical_profit_maximization, adjust_price, adjust_capital, adjust_production
+
+class TestEconomicModel(unittest.TestCase):
+
+    def test_profit_maximization(self):
+        # Test profit maximization with different demand elasticities
+        def run_profit_max(expected_demand, expected_price):
+            return neoclassical_profit_maximization(
+                current_capital=100,
+                current_labor=50,
+                current_price=10,
+                current_productivity=1.5,
+                expected_demand=expected_demand,
+                expected_price=expected_price,
+                capital_price=5,
+                capital_elasticity=0.3,
+                current_inventory=20,
+                depreciation_rate=0.1,
+                expected_periods=5,
+                discount_rate=0.05
+            )
+
+        # Elastic demand (price sensitive)
+        elastic_labor, elastic_capital, elastic_production = run_profit_max(
+            [100, 120, 140, 160, 180],
+            [10, 9, 8, 7, 6]
+        )
+
+        # Inelastic demand (less price sensitive)
+        inelastic_labor, inelastic_capital, inelastic_production = run_profit_max(
+            [100, 105, 110, 115, 120],
+            [10, 11, 12, 13, 14]
+        )
+
+        # Check if the function responds to elasticity differences
+        self.assertLess(elastic_production, inelastic_production)
+        self.assertGreater(elastic_labor, inelastic_labor)
+
+    def test_price_adjustment(self):
+        # Test price adjustment with different demand scenarios
+        current_price = 10
+        expected_demand = 100
+
+        # Excess demand
+        high_sales_price = adjust_price(current_price, 110, expected_demand)
+        self.assertGreater(high_sales_price, current_price)
+
+        # Insufficient demand
+        low_sales_price = adjust_price(current_price, 90, expected_demand)
+        self.assertLess(low_sales_price, current_price)
+
+        # Matching demand
+        matching_sales_price = adjust_price(current_price, 100, expected_demand)
+        self.assertGreater(matching_sales_price, current_price)
+
+    def test_capital_adjustment(self):
+        current_capital = 100
+        budget = 1000
+        capital_price = 10
+
+        # Test increasing capital
+        new_capital = adjust_capital(current_capital, 150, budget, capital_price)
+        self.assertGreater(new_capital, current_capital)
+        self.assertLessEqual(new_capital, current_capital + budget / capital_price)
+
+        # Test decreasing capital
+        new_capital = adjust_capital(current_capital, 50, budget, capital_price)
+        self.assertLess(new_capital, current_capital)
+
+        # Test no change needed
+        new_capital = adjust_capital(current_capital, 100, budget, capital_price)
+        self.assertEqual(new_capital, current_capital)
+
+    def test_production_adjustment(self):
+        current_production = 100
+        max_adjustment_rate = 0.1
+
+        # Test increasing production
+        new_production = adjust_production(current_production, 150, max_adjustment_rate)
+        self.assertGreater(new_production, current_production)
+        self.assertLessEqual(new_production, current_production * (1 + max_adjustment_rate))
+
+        # Test decreasing production
+        new_production = adjust_production(current_production, 50, max_adjustment_rate)
+        self.assertLess(new_production, current_production)
+        self.assertGreaterEqual(new_production, current_production * (1 - max_adjustment_rate))
+
+        # Test small change (within adjustment rate)
+        new_production = adjust_production(current_production, 105, max_adjustment_rate)
+        self.assertEqual(new_production, 105)
+
+    def test_integrated_firm_behavior(self):
+        class MockFirm:
+            def __init__(self):
+                self.production = 100
+                self.price = 10
+                self.capital = 100
+                self.budget = 1000
+                self.capital_price = 5
+                self.historic_sales = []
+                self.expected_demand = 100
+
+            def calculate_optimal_capital_and_production(self):
+                return 120, 110  # Example values
+
+            def update_price_capital_and_production(self):
+                if self.historic_sales:
+                    last_sales = self.historic_sales[-1]
+                    self.price = adjust_price(self.price, last_sales, self.expected_demand)
+                
+                optimal_capital, optimal_production = self.calculate_optimal_capital_and_production()
+                self.capital = adjust_capital(self.capital, optimal_capital, self.budget, self.capital_price)
+                self.production = adjust_production(self.production, optimal_production)
+
+        firm = MockFirm()
+
+        # Simulate 5 periods with different market conditions
+        market_conditions = [
+            {"sales": 90, "expected_demand": 100},  # Low demand
+            {"sales": 110, "expected_demand": 100},  # High demand
+            {"sales": 100, "expected_demand": 120},  # Matching current, but higher future demand
+            {"sales": 120, "expected_demand": 110},  # Exceeding expectations
+            {"sales": 80, "expected_demand": 90},   # Falling demand
+        ]
+
+        initial_state = {
+            "production": firm.production,
+            "price": firm.price,
+            "capital": firm.capital
+        }
+
+        for condition in market_conditions:
+            firm.historic_sales = [condition["sales"]]
+            firm.expected_demand = condition["expected_demand"]
+            firm.update_price_capital_and_production()
+
+        final_state = {
+            "production": firm.production,
+            "price": firm.price,
+            "capital": firm.capital
+        }
+
+        # Check if the firm has adapted to changing market conditions
+        self.assertNotEqual(initial_state, final_state)
+        self.assertGreater(final_state["capital"], initial_state["capital"])  # Assuming growth over periods
+        self.assertNotEqual(final_state["price"], initial_state["price"])  # Price should have adjusted
+    def test_simplified_profit_maximization(self):
+        def run_single_period_profit_max(expected_demand, price):
+            return neoclassical_profit_maximization(
+                current_capital=100,
+                current_labor=50,
+                current_price=price,
+                current_productivity=1.5,
+                expected_demand=[expected_demand],
+                expected_price=[price],
+                capital_price=5,
+                capital_elasticity=0.3,
+                current_inventory=0,
+                depreciation_rate=0.1,
+                expected_periods=1,
+                discount_rate=0.05
+            )
+
+        # Elastic demand scenario
+        elastic_labor, elastic_capital, elastic_production = run_single_period_profit_max(100, 8)
+
+        # Inelastic demand scenario
+        inelastic_labor, inelastic_capital, inelastic_production = run_single_period_profit_max(100, 12)
+
+        self.assertLess(elastic_production, inelastic_production)
+        print(f"Elastic production: {elastic_production}, Inelastic production: {inelastic_production}")
+if __name__ == '__main__':
+    unittest.main()

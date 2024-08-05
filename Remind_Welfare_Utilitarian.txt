@@ -1,0 +1,276 @@
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/utilitarian/bounds.gms
+
+$IFTHEN.INCONV %cm_INCONV_PENALTY% == "on"
+v02_sesoInconvPenSlack.lo(t,regi)=0;
+v02_inconvPenCoalSolids.fx("2005",regi) = 0;
+v02_inconvPenCoalSolids.lo(t,regi) = 0;
+v02_inconvPen.lo(t,regi) = 0;
+v02_inconvPen.fx("2005",regi) = 0;
+$ENDIF.INCONV
+
+*** EOF ./modules/02_welfare/utilitarian/bounds.gms
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/utilitarian/datainput.gms
+
+pm_welf(ttot)$(ttot.val ge 2005) = 1;
+pm_welf("2060") = 0.9;
+
+*RP* 2012-03-06: Inconvenience costs on seprod
+$IFTHEN.INCONV %cm_INCONV_PENALTY% == "on"
+p02_inconvpen_lap(ttot,regi,"coaltr")$(ttot.val ge 2005)      = 0.5;   !! In dollar per GJ seprod at 1.000$/cap GDP, or 10$/GJ at 10.000$_GDP/cap
+p02_inconvpen_lap(ttot,regi,"biotr")$(ttot.val ge 2005)       = 1.0;   !! In dollar per GJ seprod
+p02_inconvpen_lap(ttot,regi,"biotrmod")$(ttot.val ge 2005)    = 0.25;    !! In dollar per GJ seprod. Biotrmod is a mix of wood stoves and automated wood pellets for heating, which has lower air pollution and other discomfort effects
+*' Transformation of coal to liquids/gases/H2 brings local pollution, which is less accepted at higher incomes -> use the inconvenience cost channel
+p02_inconvpen_lap(ttot,regi,"coalftrec")$(ttot.val ge 2005)   = 0.9;    !! In dollar per GJ seprod
+p02_inconvpen_lap(ttot,regi,"coalftcrec")$(ttot.val ge 2005)  = 0.9;    !!  equivalent to 4$/GJ at 40.000$_GDP/cap, or 10$/GJ at 100.000$_GDP/cap
+p02_inconvpen_lap(ttot,regi,"coalgas")$(ttot.val ge 2005)   = 0.9;    !!
+p02_inconvpen_lap(ttot,regi,"coalh2")$(ttot.val ge 2005)   = 0.9;    !!
+p02_inconvpen_lap(ttot,regi,"coalh2c")$(ttot.val ge 2005)  = 0.9;    !!
+p02_inconvpen_lap(ttot,regi,te)$(ttot.val ge 2005) = p02_inconvpen_lap(ttot,regi,te) * 4.3 * 1E-4;            !! this is now equivalent to 1$/GJ at 1000$/per Capita in the welfare logarithm
+p02_inconvpen_lap(ttot,regi,te)$(ttot.val ge 2005) = p02_inconvpen_lap(ttot,regi,te) * (1/sm_giga_2_non) / sm_GJ_2_TWa; !! conversion util/(GJ/cap) -> util/(TWa/Gcap)
+*RP* these values are all calculated on seprod level.
+display p02_inconvpen_lap;
+$ENDIF.INCONV
+
+*** EOF ./modules/02_welfare/utilitarian/datainput.gms
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/utilitarian/declarations.gms
+
+***-------------------------------------------------------------------------------
+***                                   PARAMETERS
+***-------------------------------------------------------------------------------
+parameters
+pm_welf(tall)                                     "Weight parameter in the welfare function to avoid jumps for years between differnet time step lengths"
+pm_w(all_regi)                                    "Negishi weights"
+pm_prtp(all_regi)                                 "Pure rate of time preference"
+
+pm_sccIneq(tall,all_regi)			  "inequality term in the SCC calculation"
+
+$ifthen.inconv %cm_INCONV_PENALTY% == "on"
+p02_inconvpen_lap(ttot,all_regi,all_te)           "Parameter for inconvenience penalty for local air pollution. [T$/TWa at Consumption of 1000$/cap]"
+$endif.inconv
+
+$IFTHEN.INCONV_bioSwitch "%cm_INCONV_PENALTY_FESwitch%" == "on"
+p02_inconvPen_Switch_Track(ttot,all_regi)                       "Parameter to track magnitude of inconvenience penalty for bio/synfuel share switching [share of consumption]"
+$ENDIF.INCONV_bioSwitch
+;
+
+***-------------------------------------------------------------------------------
+***                                   VARIABLES
+***-------------------------------------------------------------------------------
+variables
+v02_welfare(all_regi)                             "Regional welfare"
+vm_welfareGlob                                    "Global welfare"
+
+$ifthen.inconv %cm_INCONV_PENALTY% == "on" 
+v02_inconvPen(ttot,all_regi)                      "Inconvenience penalty in the welfare function, e.g. for air pollution. Unit: ?Utils?"
+v02_inconvPenCoalSolids(ttot,all_regi)            "Inconvenience penalty in the welfare function, e.g. for air pollution. Unit: ?Utils?"
+v02_sesoInconvPenSlack(ttot,all_regi)             "Slack to avoid negative inconvenience penalty for Coal Solids" 
+$endif.inconv
+;
+
+$IFTHEN.INCONV_bioSwitch "%cm_INCONV_PENALTY_FESwitch%" == "on"
+positive variables
+v02_NegInconvPenFeBioSwitch(ttot,all_regi,all_enty,all_enty,emi_sectors,all_emiMkt) "Negative inconvenience penalty in the welfare function for bio/synfuel shares switch between sectors and emissions markets"
+v02_PosInconvPenFeBioSwitch(ttot,all_regi,all_enty,all_enty,emi_sectors,all_emiMkt) "Positive inconvenience penalty in the welfare function for bio/synfuel shares switch between sectors and emissions markets"
+;
+$ENDIF.INCONV_bioSwitch
+
+
+***-------------------------------------------------------------------------------
+***                                   EQUATIONS
+***-------------------------------------------------------------------------------
+equations
+q02_welfareGlob                                   "Global welfare"
+q02_welfare                                       "Regional welfare"
+
+$ifthen.inconv %cm_INCONV_PENALTY% == "on"
+q02_inconvPen(ttot,all_regi)                      "Calculate the inconvenience penalty v02_inconvPen"
+q02_inconvPenCoalSolids(ttot,all_regi)            "Calculate the inconvenience penalty v02_inconvPen"
+$endif.inconv
+
+$IFTHEN.INCONV_bioSwitch "%cm_INCONV_PENALTY_FESwitch%" == "on"
+q02_inconvPenFeBioSwitch(ttot,all_regi,all_enty,all_enty,all_te,emi_sectors,all_emiMkt)  "Calculate the inconvenience penalty to avoid switching biomass and synfuel shares in hydrocarbons in buildings, transport and industry and emissions markets if costs are relatively close"
+$ENDIF.INCONV_bioSwitch
+
+;
+
+*** EOF ./modules/02_welfare/utilitarian/declarations.gms
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/utilitarian/equations.gms
+
+*' @equations
+***---------------------------------------------------------------------------
+*' The objective of the optimization is to maximize the total discounted intertemporal utility.
+*' It is summed over all regions. 
+***---------------------------------------------------------------------------
+q02_welfareGlob..
+    vm_welfareGlob
+  =e=
+    sum(regi, pm_w(regi)*v02_welfare(regi) )
+;
+
+***---------------------------------------------------------------------------
+*' Total discounted intertemporal regional welfare calculated from per capita
+*' consumption summing over all time steps taking into account the pure time
+*' preference rate.  Assuming an intertemporal elasticity of substitution of 1,
+*' it holds:
+***---------------------------------------------------------------------------
+q02_welfare(regi) ..
+  v02_welfare(regi) 
+  =e=
+    sum(ttot$( ttot.val ge 2005 ),
+      pm_welf(ttot)
+    * pm_ts(ttot)
+    / ((1 + pm_prtp(regi)) ** (pm_ttot_val(ttot) - 2005))
+    * ( ( pm_pop(ttot,regi) 
+        * ( ( ( ( vm_cons(ttot,regi)
+            / pm_pop(ttot,regi)
+        )
+         ** (1 - 1 / pm_ies(regi))
+          - 1
+          )
+        / (1 - 1 / pm_ies(regi))
+        )$( pm_ies(regi) ne 1 )
+      + log(vm_cons(ttot,regi) / pm_pop(ttot,regi))$( pm_ies(regi) eq 1 )
+          )
+        )
+$ifthen %cm_INCONV_PENALTY% == "on"
+      - v02_inconvPen(ttot,regi)
+      - v02_inconvPenCoalSolids(ttot,regi)
+$endif
+$ifthen "%cm_INCONV_PENALTY_FESwitch%" == "on"
+        !! inconvenience cost for fuel switching in FE between fossil,
+        !! biogenic, synthetic solids, liquids and gases across sectors and
+        !! emissions markets
+      - sum((entySe,entyFe,te,sector,emiMkt)$(
+                                    se2fe(entySe,entyFe,te)
+                                AND entyFe2Sector(entyFe,sector) 
+                                AND sector2emiMkt(sector,emiMkt) 
+                                AND (entySeBio(entySe) OR  entySeFos(entySe)) ),
+          v02_NegInconvPenFeBioSwitch(ttot,regi,entySe,entyFe,sector,emiMkt)
+    + v02_PosInconvPenFeBioSwitch(ttot,regi,entySe,entyFe,sector,emiMkt)
+    )
+      / 1e3	
+$endif
+      )
+    )
+;
+
+***---------------------------------------------------------------------------
+*' Calculation of the inconvenience penalty:
+***---------------------------------------------------------------------------
+$IFTHEN.INCONV %cm_INCONV_PENALTY% == "on"
+q02_inconvPen(t,regi)$(t.val > 2005)..
+    v02_inconvPen(t,regi)
+  =g=
+*' local air pollution for all entySe production except for coal solids (=sesofos), which is treated separately (see below)
+    SUM(pe2se(enty,entySe,te)$(NOT sameas(entySe,"sesofos")),
+        p02_inconvpen_lap(t,regi,te) * (vm_prodSe(t,regi,enty,entySe,te))
+    )
+;
+
+q02_inconvPenCoalSolids(t,regi)$(t.val > 2005)..
+    v02_inconvPenCoalSolids(t,regi)
+  =g=
+*' local air pollution for coal: inconvinience penalty applies only for buildings use; slack variable ensures that v02_inconvPen can stay > 0 
+    p02_inconvpen_lap(t,regi,"coaltr") * (vm_prodSe(t,regi,"pecoal","sesofos","coaltr") 
+  - (vm_cesIO(t,regi,"fesoi") + pm_cesdata(t,regi,"fesoi","offset_quantity")))
+  + v02_sesoInconvPenSlack(t,regi)
+;
+$ENDIF.INCONV
+
+*' @stop
+
+*** small inconvenience penalty for increasing/decreasing biomass/synfuel use
+*** between two time steps in buildings and industry and emissison markets
+*** necessary to avoid switching behavior in sectors and emissions markets
+*** between time steps as those sectors and markets do not have se2fe capcities
+$IFTHEN.INCONV_bioSwitch "%cm_INCONV_PENALTY_FESwitch%" == "on"
+q02_inconvPenFeBioSwitch(ttot,regi,entySe,entyFe,te,sector,emiMkt)$(
+                                  ttot.val ge cm_startyear
+                              AND se2fe(entySe,entyFe,te) 
+                              AND entyFe2Sector(entyFe,sector) 
+                              AND sector2emiMkt(sector,emiMkt) 
+                              AND (entySeBio(entySe) OR  entySeFos(entySe)) ) ..
+    vm_demFeSector(ttot,regi,entySe,entyFe,sector,emiMkt) 
+  - vm_demFeSector(ttot-1,regi,entySe,entyFe,sector,emiMkt)
+  + v02_NegInconvPenFeBioSwitch(ttot,regi,entySe,entyFe,sector,emiMkt)
+  - v02_PosInconvPenFeBioSwitch(ttot,regi,entySe,entyFe,sector,emiMkt)
+  =e=
+  0
+;
+$ENDIF.INCONV_bioSwitch
+
+*** EOF ./modules/02_welfare/utilitarian/equations.gms
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/utilitarian/postsolve.gms
+
+$IFTHEN.INCONV_bioSwitch "%cm_INCONV_PENALTY_FESwitch%" == "on"
+*** track inconvenience penalty for bio/synfuel switching to check how large it
+*** is relative to consumption
+p02_inconvPen_Switch_Track(t,regi)
+  = sum((entySe,entyFe,te,sector,emiMkt)$(
+                                    se2fe(entySe,entyFe,te) 
+                                AND entyFe2Sector(entyFe,sector) 
+                                AND sector2emiMkt(sector,emiMkt) 
+                                AND (entySeBio(entySe) OR  entySeFos(entySe) )), 
+      v02_NegInconvPenFeBioSwitch.l(t,regi,entySe,entyFe,sector,emiMkt) 
+    + v02_PosInconvPenFeBioSwitch.l(t,regi,entySe,entyFe,sector,emiMkt)
+    )
+  / 1e3;
+$ENDIF.INCONV_bioSwitch
+
+
+*the inequality term in the SCC calculation is set to 1 here
+pm_sccIneq(tall,regi) = 1;
+
+*** EOF ./modules/02_welfare/utilitarian/postsolve.gms
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/02_welfare/utilitarian/realization.gms
+
+*' @description
+*' The utilitarian realization loads the utilitarian aka. Benthamite social welfare function, in which social welfare is equal to the discounted intertemporal sum of utility, which itself is a function of per capita consumption.
+*####################### R SECTION START (PHASES) ##############################
+$Ifi "%phase%" == "declarations" $include "./modules/02_welfare/utilitarian/declarations.gms"
+$Ifi "%phase%" == "datainput" $include "./modules/02_welfare/utilitarian/datainput.gms"
+$Ifi "%phase%" == "equations" $include "./modules/02_welfare/utilitarian/equations.gms"
+$Ifi "%phase%" == "bounds" $include "./modules/02_welfare/utilitarian/bounds.gms"
+$Ifi "%phase%" == "postsolve" $include "./modules/02_welfare/utilitarian/postsolve.gms"
+*######################## R SECTION END (PHASES) ###############################
+*** EOF ./modules/02_welfare/utilitarian/realization.gms

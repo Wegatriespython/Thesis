@@ -1,0 +1,13 @@
+{
+    "num_global_iterations": 10,
+    "mcts_config": {
+        "num_iterations": 10000,
+        "exploration_weight": 1.4,
+        "perturbation_scale": 0.1
+    },
+    "nn_config": {
+        "hidden_size": 256,
+        "learning_rate": 0.0005,
+        "train_iterations": 200
+    }
+}

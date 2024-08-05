@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 
 class TestProfitMaximization(unittest.TestCase):
     def setUp(self):
-        self.budget = 1000
         self.current_capital = 50
         self.current_labor = 10
         self.current_price = 10
@@ -14,6 +13,7 @@ class TestProfitMaximization(unittest.TestCase):
         self.avg_capital_price = 20
         self.capital_elasticity = 0.3
         self.depreciation_rate = 0.1
+        self.discount_rate = 0
 
     def test_price_adjustment_with_inventory(self):
         expected_demands = np.linspace(10, 100, 10)
@@ -29,7 +29,7 @@ class TestProfitMaximization(unittest.TestCase):
                         self.budget, self.current_capital, self.current_labor,
                         self.current_price, self.current_productivity, demand,
                         self.avg_wage, self.avg_capital_price, self.capital_elasticity,
-                        inventory, self.depreciation_rate
+                        inventory, self.depreciation_rate, self.discount_rate
                     )
                     prices.append(price)
                 except ValueError as e:
@@ -63,7 +63,8 @@ class TestProfitMaximization(unittest.TestCase):
                         self.budget, self.current_capital, self.current_labor,
                         self.current_price, self.current_productivity, demand,
                         self.avg_wage, self.avg_capital_price, self.capital_elasticity,
-                        inventory, self.depreciation_rate
+                        inventory, self.depreciation_rate,
+                        self.discount_rate
                     )
                     productions.append(production)
                 except ValueError as e:
@@ -94,7 +95,7 @@ class TestProfitMaximization(unittest.TestCase):
                     self.budget, self.current_capital, self.current_labor,
                     self.current_price, self.current_productivity, demand,
                     self.avg_wage, self.avg_capital_price, self.capital_elasticity,
-                    0, self.depreciation_rate
+                    0, self.depreciation_rate, self.discount_rate
                 )
                 prices.append(price)
             except ValueError as e:

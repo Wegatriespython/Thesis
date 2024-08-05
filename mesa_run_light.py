@@ -1,4 +1,5 @@
 # Description: Run the EconomyModel with light analysis and CSV output using Mesa's DataCollector.
+from pandas.core.arrays.base import mode
 from mesa_economy import EconomyModel
 import pandas as pd
 import numpy as np
@@ -7,17 +8,17 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def run_model(steps, timeout=300):  # 5 minutes timeout
-    model = EconomyModel(num_workers=20, num_firm1=2, num_firm2=5)
+    model = EconomyModel(num_workers=30, num_firm1=2, num_firm2=5, mode= 'decentralised')
     for i in range(steps):
         model.step()
     return model
 
 # Run the model
-model = run_model(100)  # Run for 100 steps
+model = run_model(20)  # Run for 100 steps
 
 if model:
     logging.info("Model completed successfully. Starting analysis...")
-    
+
     # Get the dataframes from Mesa's DataCollector
     model_vars = model.datacollector.get_model_vars_dataframe()
     agent_vars = model.datacollector.get_agent_vars_dataframe()
